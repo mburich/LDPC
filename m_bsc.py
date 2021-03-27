@@ -1,8 +1,7 @@
-import shelve
-
 import numpy as np
 from LDPC_lib import LDPC_Code
 import matplotlib.pyplot as plt
+
 import sys
 
 
@@ -54,7 +53,7 @@ for pflip in p_vector:
     for p in range(pckts):
         pck_ber = LDPC.SimulateBSCPacket(pflip,maxite=200)
         ers.append(pck_ber)
-        print("Packet BER=" + str(np.mean(pck_ber)),flush=True)
+        print("Packet ="+str(p)+" Pflip ="+str(pflip)+" Packet BER=" + str(np.mean(pck_ber)),flush=True)
         print("Ensemble BER=" + str(np.mean(ers)),flush=True)
     print("AWGN BER=" + str(np.mean(ers)),flush=True)
     simuber.append(np.mean(ers))
@@ -64,16 +63,7 @@ plt.ylabel('BER')
 # plt.show()
 plt.savefig('bsc_ber.png')
 
-##
-filename ='./shelve_bsc.out'
-my_shelf = shelve.open(filename,'n') # 'n' for new
-
-for key in dir():
-    try:
-        my_shelf[key] = globals()[key]
-    except TypeError:
-        #
-        # __builtins__, my_shelf, and imported modules can not be shelved.
-        #
-        print('ERROR shelving: {0}'.format(key))
-my_shelf.close()
+print(pflip_capacity)
+print(p_vector)
+print(np.array(deber))
+print(np.array(simuber))

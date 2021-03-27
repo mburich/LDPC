@@ -78,11 +78,10 @@ class Chk(Node):
         msg = 1.0
         for l in self.ListNodes:
             if edge != l:
-                s = self.getmsg(l) / 2.0
+                s = np.tanh(self.getmsg(l) / 2.0)
                 if np.abs(s) > 0.9999999999999999:
                     s = np.sign(s) * 0.9999999999999999  # highest precision
-                s = 2.0 * np.arctanh(s)
-                msg = msg * np.tanh(s)
+                msg = msg * s
 
         if np.abs(msg) > 0.9999999999999999:
             msg = np.sign(msg) * 0.9999999999999999  # highest precision
@@ -399,10 +398,12 @@ class LDPC_Code:
         if channel == 'AWGN':
             if n_variance != None:
                 for c in range(codeword.shape[0]):
-                    self.BitNodes[c].LLR = - 2 * codeword[c] / (n_variance)
+                    self.BitNodes[c].LLR = -2.0*codeword[c]/(n_variance)
             else:
                 print("insert awgn",flush=True)
                 return
+
+        self.cleanmsgs()
 
         rpt = np.zeros(len(self.BitNodes))
         rpt_prev = np.zeros(len(self.BitNodes))
