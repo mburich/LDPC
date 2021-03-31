@@ -179,6 +179,7 @@ class LDPC_Code:
     def __init__(self, DegBits, DegChk, K=10000):
         self.G = None
         self.H = None
+        self.tanhtable = None
         self.DegBits = DegBits
         self.DegChk = DegChk
         self.AvgDegBits = np.sum(DegBits['deg'] * DegBits['dist'])
@@ -191,24 +192,56 @@ class LDPC_Code:
 
         self.NumChk = self.N - self.K
 
+    @staticmethod
+    def xpos_to_idx(x,max_pdf,x_res):
+        return (np.round((x+max_pdf)/(x_res))).astype(int)
+
+    @staticmethod
+    def buildtanhtable(x_pdf,max_pdf,x_res):
+        print("Building Tanh Table")
+        t = (np.tanh(x_pdf / 2.0))
+        x, y = np.meshgrid(range(len(x_pdf)), range(len(x_pdf)))
+        z = t[x]*t[y]
+        idx_z = tuple([np.abs(z) > 0.9999999999999999])
+        z[idx_z] = np.sign(z[idx_z])*0.9999999999999999
+        tanhtable = LDPC_Code.xpos_to_idx(2.0*np.arctanh(z),max_pdf,x_res)
+        pos_idx = np.unique(tanhtable)
+        pos_dict = {}
+        for i in range(tanhtable.shape[0]):
+            for j in range(tanhtable.shape[1]):
+                xy = tanhtable [i,j]
+                if not xy in pos_dict.keys():
+                    pos_dict[xy] = [[i,j]]
+                else:
+                    pos_dict[xy].append([i, j])
+        for i in pos_dict.keys():
+            pos_dict[i] = np.array(pos_dict[i])
+        # for i in pos_idx:
+        #     pos_dict[i] = np.where(tanhtable == i)
+        print("Finished Tanh Table")
+
+        return tanhtable,pos_dict
 
     def densityevolution(self,channel='AWGN',N0=None,pflip=None,max_pdf=50,pts=100,max_ite=100):
-        def xpos_to_idx(x):
-            return round((x+max_pdf)/(x_res))
 
         def normalizepdf(x):
             return x/(np.sum(x))
 
-        def buildtanhtable(x_pdf):
+
+
+
+        def slowbuildtanhtable(x_pdf):
+            print("Building Slow Tanh Table")
             c = np.zeros((len(x_pdf),len(x_pdf)),dtype=np.int)
             for ka in range(len(x_pdf)):
-                for kb in range(len(x_pdf)):
+                for kb in range(ka,len(x_pdf)):
                     s = (np.tanh(x_pdf[ka] / 2.0) * np.tanh(x_pdf[kb] / 2.0))
                     if np.abs(s) > 0.9999999999999999:
                         s = np.sign(s) * 0.9999999999999999  # highest precision
                     s = 2.0 * np.arctanh(s)
-                    idx = xpos_to_idx(s)
+                    idx = LDPC_Code.xpos_to_idx(s,max_pdf,x_res)
                     c[ka, kb] = idx
+                    c[kb, ka] = idx
             return c
 
         if self.AvgDegBits*self.N!=self.AvgDegChk*self.NumChk:
@@ -221,21 +254,33 @@ class LDPC_Code:
 
 
 
+        if self.tanhtable is None:
+            self.tanhtable = LDPC_Code.buildtanhtable(x_pdf,max_pdf,x_res)
 
-        tanhtable = buildtanhtable(x_pdf)
-
-        def tanhdensity(a,b):
+        def slowtanhdensity(a,b):
             c = 0*x_pdf
             for ka in range(len(x_pdf)):
                 for kb in range(len(x_pdf)):
                     prob = a[ka]*b[kb]
                     if prob<1e-16:
                         continue
-                    idx = tanhtable[ka,kb]
+                    idx = self.tanhtable[0][ka,kb]
                     c[idx] = prob+c[idx]
             return normalizepdf(c)
 
+        def tanhdensity(a,b):
+            pos_dict = self.tanhtable[1]
+            c = 0*x_pdf
+            prob_vec = a.reshape(-1,1)@b.reshape(1,-1)
+            for ka in pos_dict.keys():
+                idx = ka
+                cords = pos_dict[ka]
+                c[idx] = np.sum(prob_vec[cords[:,0],cords[:,1]])
 
+                # x_cord = pos_dict[ka][0]
+                # y_cord = pos_dict[ka][1]
+                # c[idx] = np.sum(prob_vec[x_cord,y_cord])
+            return normalizepdf(c)
 
         if channel=='AWGN':
         #ch_msg = 2y/n_var -> y = x+n -> x = -1 always [all zeros] -> mean(ch_msg) = +2/n_var -> var(ch_msg) = 4/n_var
@@ -248,8 +293,8 @@ class LDPC_Code:
         # sending all-zeros -> w.p. pflip we get np.log(pflip / (1.0 - pflip)) -> w.p. (1-p) we get -np.log(pflip / (1.0 - pflip))
             ch_pdf = 0*x_pdf
             xp = np.log((1-pflip) / pflip)
-            ch_pdf[xpos_to_idx(xp)] = 1-pflip
-            ch_pdf[xpos_to_idx(-xp)] = pflip
+            ch_pdf[LDPC_Code.xpos_to_idx(xp,max_pdf,x_res)] = 1-pflip
+            ch_pdf[LDPC_Code.xpos_to_idx(-xp,max_pdf,x_res)] = pflip
         else:
             return
 

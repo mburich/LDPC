@@ -4,10 +4,17 @@ import matplotlib.pyplot as plt
 
 import sys
 
+np.random.seed(0)
 
 K = 10000 # information block size
-pckts = 20# number of packets
+pckts = 100# number of packets
+pts_de = 501
+max_ite = 150
+max_pdf = 100
 
+print("Points DE =" +str(pts_de),flush=True)
+print("Max Ite DE ="+str(max_ite),flush=True)
+print("Max PDF DE="+str(max_pdf),flush=True)
 print("K = " + str(K),flush=True)
 print("Packets = " + str(pckts),flush=True)
 
@@ -38,13 +45,14 @@ print("Rate=" + str(LDPC.CodeRate) + " N=" + str(LDPC.N) + " K=" + str(LDPC.K),f
 print("Capacity -> Pflip=" + str(pflip_capacity),flush=True)
 
 p_vector = np.linspace(0.05,0.12,20)
+print("Pflip ="+str(p_vector))
 simuber = []
 deber=[]
 for pflip in p_vector:
-    deber.append(LDPC.densityevolution(channel='BSC',pflip=pflip,pts=401,max_ite=100,max_pdf=100))
+    deber.append(LDPC.densityevolution(channel='BSC',pflip=pflip,pts=pts_de,max_ite=max_ite,max_pdf=max_pdf))
 
 plt.figure(1)
-plt.semilogy(p_vector,np.array(deber),'k--x')
+plt.semilogy(p_vector,np.array(deber),'k--x',label="Density Evolution")
 plt.grid()
 plt.title('LDPC - Regular (3,6) - K = '+str(K))
 
@@ -55,15 +63,19 @@ for pflip in p_vector:
         ers.append(pck_ber)
         print("Packet ="+str(p)+" Pflip ="+str(pflip)+" Packet BER=" + str(np.mean(pck_ber)),flush=True)
         print("Ensemble BER=" + str(np.mean(ers)),flush=True)
-    print("AWGN BER=" + str(np.mean(ers)),flush=True)
+    print("BSC BER=" + str(np.mean(ers)+" pflip="+str(pflip)),flush=True)
     simuber.append(np.mean(ers))
-plt.semilogy(p_vector,np.array(simuber),'r--^')
-plt.xlabel('Crossover probability p')
-plt.ylabel('BER')
-# plt.show()
-plt.savefig('bsc_ber.png')
 
 print(pflip_capacity)
 print(p_vector)
 print(np.array(deber))
 print(np.array(simuber))
+
+plt.semilogy(p_vector,np.array(simuber),'r--^',label="Simulation")
+plt.xlabel('Crossover probability p')
+plt.ylabel('BER')
+# plt.show()
+plt.legend(loc="upper left")
+
+plt.savefig('bsc_ber.png')
+
